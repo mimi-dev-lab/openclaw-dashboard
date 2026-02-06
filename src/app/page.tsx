@@ -13,6 +13,7 @@ import {
   SessionList,
   ConnectionPanel,
   CronJobs,
+  ModelQuota,
 } from '@/components/dashboard';
 import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -103,9 +104,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Middle Row - Charts */}
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               <HealthTrend />
               <TokenUsage />
+              <ModelQuota />
             </div>
 
             {/* Bottom Row - Details */}
