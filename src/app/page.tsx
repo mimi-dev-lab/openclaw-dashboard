@@ -12,6 +12,7 @@ import {
   QuickActions,
   SessionList,
   ConnectionPanel,
+  CronJobs,
 } from '@/components/dashboard';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -85,9 +86,10 @@ export default function DashboardPage() {
                 <ChannelStatus />
               </div>
 
-              {/* Middle - Sessions */}
-              <div className="lg:col-span-5">
+              {/* Middle - Sessions & Cron */}
+              <div className="lg:col-span-5 space-y-6">
                 <SessionList />
+                <CronJobs />
               </div>
 
               {/* Right - Activity */}

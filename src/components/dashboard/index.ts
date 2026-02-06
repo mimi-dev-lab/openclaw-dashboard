@@ -8,3 +8,4 @@ export { ActivityLog } from './ActivityLog';
 export { QuickActions } from './QuickActions';
 export { SessionList } from './SessionList';
 export { ConnectionPanel } from './ConnectionPanel';
+export { CronJobs } from './CronJobs';
