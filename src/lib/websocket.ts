@@ -1,6 +1,6 @@
 'use client';
 
-import type { RPCRequest, RPCResponse, ConnectParams } from './types';
+import type { RPCResponse } from './types';
 
 type MessageHandler = (message: unknown) => void;
 type ConnectionHandler = (connected: boolean) => void;
@@ -20,6 +20,8 @@ export class GatewayWebSocket {
     timeout: NodeJS.Timeout;
   }> = new Map();
   private requestId = 0;
+  private authenticated = false;
+  private pendingNonce: string | null = null;
 
   constructor(url: string, token: string) {
     this.url = url;
@@ -30,27 +32,17 @@ export class GatewayWebSocket {
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.url);
+        this.authenticated = false;
 
         this.ws.onopen = () => {
-          console.log('[WS] Connected, sending auth...');
-          // Send connect message with auth
-          const connectMsg: { connect: { params: ConnectParams } } = {
-            connect: {
-              params: {
-                auth: { token: this.token }
-              }
-            }
-          };
-          this.ws?.send(JSON.stringify(connectMsg));
-          this.reconnectAttempts = 0;
-          this.notifyConnectionHandlers(true);
-          resolve();
+          console.log('[WS] WebSocket opened, waiting for challenge...');
+          // Don't notify connected yet - wait for authentication
         };
 
         this.ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            this.handleMessage(data);
+            this.handleMessage(data, resolve, reject);
           } catch (err) {
             console.error('[WS] Failed to parse message:', err);
           }
@@ -58,6 +50,7 @@ export class GatewayWebSocket {
 
         this.ws.onclose = (event) => {
           console.log('[WS] Disconnected:', event.code, event.reason);
+          this.authenticated = false;
           this.notifyConnectionHandlers(false);
           this.handleDisconnect();
         };
@@ -72,24 +65,84 @@ export class GatewayWebSocket {
     });
   }
 
-  private handleMessage(data: unknown) {
+  private sendConnect(nonce?: string) {
+    const connectRequest = {
+      type: 'req',
+      id: `connect-${Date.now()}`,
+      method: 'connect',
+      params: {
+        minProtocol: 3,
+        maxProtocol: 3,
+        client: {
+          id: 'openclaw-dashboard',
+          version: '0.1.0',
+          platform: 'web',
+          mode: 'operator'
+        },
+        role: 'operator',
+        scopes: ['operator.read', 'operator.write'],
+        caps: [],
+        commands: [],
+        permissions: {},
+        auth: { token: this.token },
+        locale: 'zh-CN',
+        userAgent: 'openclaw-dashboard/0.1.0',
+        ...(nonce ? { device: { nonce } } : {})
+      }
+    };
+    console.log('[WS] Sending connect request...');
+    this.ws?.send(JSON.stringify(connectRequest));
+  }
+
+  private handleMessage(data: unknown, onConnect?: () => void, onError?: (err: Error) => void) {
+    if (typeof data !== 'object' || data === null) return;
+    
+    const msg = data as Record<string, unknown>;
+    
+    // Handle connect challenge
+    if (msg.type === 'event' && msg.event === 'connect.challenge') {
+      const payload = msg.payload as { nonce: string; ts: number } | undefined;
+      console.log('[WS] Received challenge, nonce:', payload?.nonce?.slice(0, 8) + '...');
+      this.pendingNonce = payload?.nonce || null;
+      this.sendConnect(this.pendingNonce || undefined);
+      return;
+    }
+    
+    // Handle connect response
+    if (msg.type === 'res' && typeof msg.id === 'string' && msg.id.startsWith('connect-')) {
+      if (msg.ok) {
+        console.log('[WS] Authentication successful!');
+        this.authenticated = true;
+        this.reconnectAttempts = 0;
+        this.notifyConnectionHandlers(true);
+        onConnect?.();
+      } else {
+        const error = msg.error as { message?: string } | undefined;
+        const errorMsg = error?.message || 'Authentication failed';
+        console.error('[WS] Authentication failed:', errorMsg);
+        onError?.(new Error(errorMsg));
+      }
+      return;
+    }
+    
     // Check if it's an RPC response
-    if (typeof data === 'object' && data !== null && 'id' in data) {
+    if (msg.type === 'res' && typeof msg.id === 'string') {
       const response = data as RPCResponse;
       const pending = this.pendingRequests.get(response.id);
       if (pending) {
         clearTimeout(pending.timeout);
         this.pendingRequests.delete(response.id);
-        if (response.error) {
-          pending.reject(new Error(response.error.message));
+        if (!response.ok && response.error) {
+          const err = response.error as { message?: string };
+          pending.reject(new Error(err.message || 'Request failed'));
         } else {
-          pending.resolve(response.result);
+          pending.resolve(response.payload);
         }
         return;
       }
     }
 
-    // Notify all message handlers
+    // Notify all message handlers for other events
     this.messageHandlers.forEach(handler => handler(data));
   }
 
@@ -121,9 +174,18 @@ export class GatewayWebSocket {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('Not connected');
     }
+    
+    if (!this.authenticated) {
+      throw new Error('Not authenticated');
+    }
 
     const id = `req-${++this.requestId}`;
-    const request: RPCRequest = { id, method, params };
+    const request = {
+      type: 'req',
+      id,
+      method,
+      params: params || {}
+    };
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {

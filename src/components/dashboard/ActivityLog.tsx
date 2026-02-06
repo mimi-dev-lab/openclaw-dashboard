@@ -1,7 +1,6 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ScrollText, MessageSquare, Zap, AlertCircle, CheckCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getGateway } from '@/lib/websocket';

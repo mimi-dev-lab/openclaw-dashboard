@@ -30,12 +30,6 @@ function getSessionName(key: string): string {
   return key.split(':').pop() || key;
 }
 
-function getTokenColor(percent: number): string {
-  if (percent >= 80) return 'bg-red-500';
-  if (percent >= 60) return 'bg-yellow-500';
-  return 'bg-green-500';
-}
-
 export function SessionList() {
   const { sessions } = useGatewayStore();
 

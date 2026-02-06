@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,18 +10,47 @@ import { Wifi, WifiOff, Loader2 } from 'lucide-react';
 
 const DEFAULT_URL = 'ws://127.0.0.1:18789';
 
+// Get initial values outside component to avoid effect setState issues
+function getInitialCredentials() {
+  if (typeof window === 'undefined') return { url: DEFAULT_URL, token: '' };
+  
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('token');
+  const urlGateway = params.get('gatewayUrl') || params.get('url');
+  
+  const token = urlToken || localStorage.getItem('openclaw-gateway-token') || '';
+  const url = urlGateway || localStorage.getItem('openclaw-gateway-url') || DEFAULT_URL;
+  
+  return { url, token };
+}
+
 export function ConnectionPanel() {
   const { connected, connecting, error, connect, disconnect } = useGatewayStore();
-  const [url, setUrl] = useState(DEFAULT_URL);
-  const [token, setToken] = useState('');
+  const initial = getInitialCredentials();
+  const [url, setUrl] = useState(initial.url);
+  const [token, setToken] = useState(initial.token);
+  const initRef = useRef(false);
 
-  // Load saved connection from localStorage
+  // Handle auto-connect on mount
   useEffect(() => {
-    const savedUrl = localStorage.getItem('openclaw-gateway-url');
-    const savedToken = localStorage.getItem('openclaw-gateway-token');
-    if (savedUrl) setUrl(savedUrl);
-    if (savedToken) setToken(savedToken);
-  }, []);
+    if (initRef.current) return;
+    initRef.current = true;
+    
+    const creds = getInitialCredentials();
+    
+    // Clean URL for security
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    
+    // Auto-connect if we have credentials
+    if (creds.url && creds.token) {
+      localStorage.setItem('openclaw-gateway-url', creds.url);
+      localStorage.setItem('openclaw-gateway-token', creds.token);
+      connect(creds.url, creds.token);
+    }
+  }, [connect]);
 
   const handleConnect = async () => {
     // Save to localStorage
@@ -32,55 +61,9 @@ export function ConnectionPanel() {
   };
 
   const handleDisconnect = () => {
+    localStorage.removeItem('openclaw-gateway-token');
     disconnect();
   };
-
-  // Auto-connect from URL params or saved credentials
-  useEffect(() => {
-    // Check URL params first (for easy testing)
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    const urlGateway = params.get('gatewayUrl') || params.get('url');
-    
-    let connectUrl = url;
-    let connectToken = token;
-    
-    if (urlToken) {
-      connectToken = urlToken;
-      setToken(urlToken);
-      // Remove token from URL for security
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-    if (urlGateway) {
-      connectUrl = urlGateway;
-      setUrl(urlGateway);
-    }
-    
-    // Fall back to localStorage
-    if (!connectToken) {
-      const savedToken = localStorage.getItem('openclaw-gateway-token');
-      if (savedToken) {
-        connectToken = savedToken;
-        setToken(savedToken);
-      }
-    }
-    if (!connectUrl || connectUrl === DEFAULT_URL) {
-      const savedUrl = localStorage.getItem('openclaw-gateway-url');
-      if (savedUrl) {
-        connectUrl = savedUrl;
-        setUrl(savedUrl);
-      }
-    }
-    
-    // Auto-connect if we have credentials
-    if (connectUrl && connectToken && !connected && !connecting) {
-      // Small delay to ensure state is set
-      setTimeout(() => {
-        connect(connectUrl, connectToken);
-      }, 100);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
 
   if (connected) {
     return (

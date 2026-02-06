@@ -12,6 +12,11 @@ import type {
 } from '@/lib/types';
 import { getGateway, resetGateway } from '@/lib/websocket';
 
+interface HealthPoint {
+  time: string;
+  score: number;
+}
+
 interface GatewayState {
   // Connection
   connected: boolean;
@@ -24,6 +29,7 @@ interface GatewayState {
   sessions: Session[];
   channels: Channel[];
   health: HealthStatus | null;
+  healthHistory: HealthPoint[];
   metrics: SystemMetrics | null;
   tasks: Task[];
   
@@ -37,6 +43,22 @@ interface GatewayState {
   fetchHealth: () => Promise<void>;
 }
 
+function generateMockHealthHistory(): HealthPoint[] {
+  const data: HealthPoint[] = [];
+  const now = new Date();
+  
+  for (let i = 23; i >= 0; i--) {
+    const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+    const timeStr = `${time.getHours().toString().padStart(2, '0')}:00`;
+    const baseScore = 85;
+    const variation = Math.sin(i * 0.5) * 10 + Math.random() * 5;
+    const score = Math.max(60, Math.min(100, Math.round(baseScore + variation)));
+    data.push({ time: timeStr, score });
+  }
+  
+  return data;
+}
+
 export const useGatewayStore = create<GatewayState>((set, get) => ({
   // Initial state
   connected: false,
@@ -47,6 +69,7 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
   sessions: [],
   channels: [],
   health: null,
+  healthHistory: generateMockHealthHistory(),
   metrics: null,
   tasks: [],
 
@@ -88,6 +111,7 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
       sessions: [],
       channels: [],
       health: null,
+      healthHistory: generateMockHealthHistory(),
       metrics: null,
       tasks: []
     });
@@ -114,9 +138,8 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
         channelSummary?: string[];
       }>('status');
       
-      // Get enabled agents count
+      // Get agents from heartbeat
       const agents = result?.heartbeat?.agents || [];
-      const enabledAgents = agents.filter(a => a.enabled).length;
       
       set({
         status: {
@@ -247,8 +270,6 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
       // Calculate health based on channels and overall status
       const channels = result?.channels || {};
       const channelErrors = Object.values(channels).filter(c => c.lastError).length;
-      const runningChannels = Object.values(channels).filter(c => c.running).length;
-      const totalChannels = Object.keys(channels).length;
       
       let score = result?.ok ? 100 : 50;
       score -= channelErrors * 15;
@@ -272,14 +293,28 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
         });
       }
 
+      const finalScore = Math.max(0, Math.min(100, score));
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      
+      const currentHistory = get().healthHistory;
+      const lastPoint = currentHistory[currentHistory.length - 1];
+      
+      // Only add new point if different
+      let newHistory = currentHistory;
+      if (!lastPoint || lastPoint.time !== timeStr || lastPoint.score !== finalScore) {
+        newHistory = [...currentHistory, { time: timeStr, score: finalScore }].slice(-24);
+      }
+      
       set({
         health: {
-          score: Math.max(0, Math.min(100, score)),
-          status: score >= 80 ? 'healthy' : score >= 60 ? 'warning' : 'critical',
+          score: finalScore,
+          status: finalScore >= 80 ? 'healthy' : finalScore >= 60 ? 'warning' : 'critical',
           issues,
           channelErrors,
           logErrors: issues.length
-        }
+        },
+        healthHistory: newHistory
       });
     } catch (err) {
       console.error('Failed to fetch health:', err);

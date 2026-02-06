@@ -85,29 +85,26 @@ export interface CronJob {
 
 // RPC Types
 export interface RPCRequest {
+  type: 'req';
   id: string;
   method: string;
   params?: Record<string, unknown>;
 }
 
 export interface RPCResponse<T = unknown> {
+  type: 'res';
   id: string;
-  result?: T;
+  ok: boolean;
+  payload?: T;
   error?: {
-    code: number;
+    code?: number;
     message: string;
   };
 }
 
 // WebSocket Message Types
 export interface WSMessage {
-  type: string;
+  type: 'event' | 'req' | 'res';
+  event?: string;
   payload?: unknown;
-}
-
-export interface ConnectParams {
-  auth: {
-    token?: string;
-    password?: string;
-  };
 }
