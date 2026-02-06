@@ -14,6 +14,7 @@ import {
   ConnectionPanel,
   CronJobs,
   ModelQuota,
+  LogViewer,
 } from '@/components/dashboard';
 import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -124,9 +125,10 @@ export default function DashboardPage() {
                 <CronJobs />
               </div>
 
-              {/* Right - Activity */}
-              <div className="lg:col-span-3">
+              {/* Right - Activity & Logs */}
+              <div className="lg:col-span-3 space-y-6">
                 <ActivityLog />
+                <LogViewer />
               </div>
             </div>
           </div>
