@@ -2,6 +2,8 @@
 
 OpenClaw AI Agent 监控仪表盘 - 实时查看 Gateway 状态、Agent、会话、通道健康度。
 
+**🌐 在线访问**: https://openclaw.mimi-bot.com
+
 ## 功能特性
 
 - 📊 **系统概览** - Gateway 状态、CPU、内存、运行时间
