@@ -14,11 +14,12 @@ import {
   ConnectionPanel,
   CronJobs,
 } from '@/components/dashboard';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
-  const { connected, refresh } = useGatewayStore();
+  const { connected, refresh, sessions, agents, health } = useGatewayStore();
 
   return (
     <div className="min-h-screen bg-background">
@@ -32,9 +33,27 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground">系统状态监控面板</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {connected && (
               <>
+                {/* Quick Stats */}
+                <div className="hidden md:flex items-center gap-3 text-sm">
+                  <Badge variant="outline" className="gap-1">
+                    🤖 {agents.length} Agents
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    💬 {sessions.length} Sessions
+                  </Badge>
+                  {health && (
+                    <Badge 
+                      variant={health.score >= 80 ? 'default' : health.score >= 60 ? 'secondary' : 'destructive'}
+                      className="gap-1"
+                    >
+                      ❤️ {health.score}
+                    </Badge>
+                  )}
+                </div>
+                <div className="h-4 w-px bg-border" />
                 <Button 
                   variant="ghost" 
                   size="sm"
@@ -47,6 +66,17 @@ export default function DashboardPage() {
                 <ConnectionPanel />
               </>
             )}
+            {/* Connection Status Indicator */}
+            <div className="flex items-center gap-1.5">
+              {connected ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-500" />
+              )}
+              <span className={`text-xs ${connected ? 'text-green-500' : 'text-red-500'}`}>
+                {connected ? '已连接' : '离线'}
+              </span>
+            </div>
           </div>
         </div>
       </header>
