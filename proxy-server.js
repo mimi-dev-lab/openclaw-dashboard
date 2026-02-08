@@ -1755,7 +1755,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Cron job actions (run/toggle/remove) via Gateway API
+  // Cron job actions (run/toggle/remove) via CLI
   if (url.pathname === '/api/cron/action' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -1768,23 +1768,24 @@ const server = http.createServer(async (req, res) => {
           return;
         }
         
-        let method = '';
-        let params = { jobId };
+        const { execSync } = require('child_process');
+        let cmd = '';
+        
         if (action === 'run') {
-          method = 'cron.run';
-          params.runMode = 'force';
+          cmd = `openclaw cron run "${jobId}"`;
         } else if (action === 'remove') {
-          method = 'cron.remove';
+          cmd = `openclaw cron rm "${jobId}"`;
         } else if (action === 'toggle') {
-          method = 'cron.update';
-          params.patch = { enabled };
+          cmd = enabled 
+            ? `openclaw cron enable "${jobId}"`
+            : `openclaw cron disable "${jobId}"`;
         } else {
           res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Invalid action' }));
           return;
         }
         
-        await gatewayRpc('insecure', method, params);
+        execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
         // Clear cache so next fetch gets fresh data
         cache.data['cron-jobs'] = null;
         res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
