@@ -1834,7 +1834,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const result = await gatewayRpc(token, 'cron.runs', { jobId });
       res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, runs: result.runs || [] }));
+      // Gateway API 返回 entries，统一返回为 entries
+      res.end(JSON.stringify({ ok: true, entries: result.entries || result.runs || [] }));
     } catch (err) {
       res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err.message }));

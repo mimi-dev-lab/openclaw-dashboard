@@ -55,21 +55,36 @@ function parseCronToHuman(expr: string): string {
   
   const [minute, hour, day, month, weekday] = parts;
   
+  // 每 N 分钟: */N * * * *
   if (minute.startsWith('*/') && hour === '*') {
     const interval = parseInt(minute.slice(2));
     return `每 ${interval} 分钟`;
   }
   
+  // 每 N 小时: 0 */N * * *
   if (minute === '0' && hour.startsWith('*/')) {
     const interval = parseInt(hour.slice(2));
     return `每 ${interval} 小时`;
   }
   
-  if (day === '*' && month === '*' && weekday === '*') {
+  // 每小时整点: 0 * * * *
+  if (minute === '0' && hour === '*' && day === '*' && month === '*' && weekday === '*') {
+    return '每小时整点';
+  }
+  
+  // 每小时 N 分: N * * * *
+  if (hour === '*' && day === '*' && month === '*' && weekday === '*') {
+    return `每小时 ${minute} 分`;
+  }
+  
+  // 每天特定时间: M H * * *
+  if (day === '*' && month === '*' && weekday === '*' && hour !== '*') {
     const h = parseInt(hour);
     const m = parseInt(minute);
-    const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    return `每天 ${timeStr}`;
+    if (!isNaN(h) && !isNaN(m)) {
+      const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      return `每天 ${timeStr}`;
+    }
   }
   
   if (day === '*' && month === '*' && weekday !== '*') {
