@@ -154,7 +154,7 @@ function LogModal({
     if (isOpen && sessionKey) {
       setIsLoading(true);
       const baseUrl = `http://${window.location.hostname}:18790`;
-      fetch(`${baseUrl}/api/sessions/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=20`)
+      fetch(`${baseUrl}/api/sessions/history?key=${encodeURIComponent(sessionKey)}&limit=20`)
         .then(res => res.json())
         .then(data => {
           setMessages(data.messages || []);

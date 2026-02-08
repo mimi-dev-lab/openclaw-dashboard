@@ -1951,37 +1951,50 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Session history
+  // Session history (read from local JSONL files)
   if (url.pathname === '/api/sessions/history' && req.method === 'GET') {
+    const sessionKey = url.searchParams.get('key');
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    if (!sessionKey) {
+      res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Missing key' }));
+      return;
+    }
     try {
-      const sessionKey = url.searchParams.get('key');
-      if (!sessionKey) {
-        res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Missing key' }));
-        return;
+      // Extract UUID from session key (format: agent:xxx:cron:xxx:run:UUID or just UUID)
+      let sessionId = sessionKey;
+      if (sessionKey.includes(':run:')) {
+        sessionId = sessionKey.split(':run:').pop();
+      } else if (sessionKey.includes(':')) {
+        // Try last part after colon
+        const parts = sessionKey.split(':');
+        sessionId = parts[parts.length - 1];
       }
       
-      const history = [];
-      const agentsBase = process.env.HOME + '/.openclaw/agents';
-      const agentDirs = ['claude-main', 'main'];
+      // Extract agent from session key
+      let agentDir = 'claude-main';
+      if (sessionKey.startsWith('agent:')) {
+        const parts = sessionKey.split(':');
+        if (parts.length >= 2) agentDir = parts[1];
+      }
       
-      for (const agentDir of agentDirs) {
-        const sessionFile = path.join(agentsBase, agentDir, 'sessions', `${sessionKey}.jsonl`);
+      const messages = [];
+      const agentsBase = process.env.HOME + '/.openclaw/agents';
+      const searchDirs = [agentDir, 'main', 'claude-main', 'claude-sonnet', 'claude-haiku'];
+      
+      for (const dir of searchDirs) {
+        const sessionFile = path.join(agentsBase, dir, 'sessions', `${sessionId}.jsonl`);
         if (fs.existsSync(sessionFile)) {
           const content = fs.readFileSync(sessionFile, 'utf-8');
           const lines = content.trim().split('\n').filter(l => l);
           
-          for (const line of lines.slice(-50)) { // Last 50 messages
+          for (const line of lines.slice(-limit)) {
             try {
               const entry = JSON.parse(line);
               if (entry.message) {
-                let content = entry.message.content;
-                if (Array.isArray(content)) {
-                  content = content.map(c => c.text || c.content || '').join('\n');
-                }
-                history.push({
+                messages.push({
                   role: entry.message.role || 'assistant',
-                  content,
+                  content: entry.message.content,
                   timestamp: entry.timestamp,
                 });
               }
@@ -1992,7 +2005,7 @@ const server = http.createServer(async (req, res) => {
       }
       
       res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, history }));
+      res.end(JSON.stringify({ ok: true, messages }));
     } catch (err) {
       res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err.message }));
