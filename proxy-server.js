@@ -1822,20 +1822,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Cron job runs history
+  // Cron job runs history (use CLI instead of WebSocket for auth simplicity)
   if (url.pathname === '/api/cron/runs' && req.method === 'GET') {
-    const token = url.searchParams.get('token');
     const jobId = url.searchParams.get('jobId');
-    if (!token || !jobId) {
+    if (!jobId) {
       res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'Missing token or jobId' }));
+      res.end(JSON.stringify({ ok: false, error: 'Missing jobId' }));
       return;
     }
     try {
-      const result = await gatewayRpc(token, 'cron.runs', { jobId });
+      const { execSync } = require('child_process');
+      const output = execSync(`openclaw cron runs --id "${jobId}" --limit 20`, { 
+        encoding: 'utf-8', 
+        timeout: 15000 
+      });
+      const data = JSON.parse(output);
       res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
-      // Gateway API 返回 entries，统一返回为 entries
-      res.end(JSON.stringify({ ok: true, entries: result.entries || result.runs || [] }));
+      res.end(JSON.stringify({ ok: true, entries: data.entries || [] }));
     } catch (err) {
       res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err.message }));

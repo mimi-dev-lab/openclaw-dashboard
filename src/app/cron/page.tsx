@@ -287,7 +287,7 @@ function RunHistory({
     if (isExpanded) {
       setIsLoading(true);
       const baseUrl = `http://${window.location.hostname}:18790`;
-      fetch(`${baseUrl}/api/cron/runs?token=insecure&jobId=${encodeURIComponent(jobId)}`)
+      fetch(`${baseUrl}/api/cron/runs?jobId=${encodeURIComponent(jobId)}`)
         .then(res => res.json())
         .then(data => {
           // 接口返回的是 entries 而不是 runs
