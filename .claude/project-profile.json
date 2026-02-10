@@ -1,0 +1,36 @@
+{
+  "name": "openclaw-dashboard",
+  "detectedAt": "2026-02-11",
+  "description": "OpenClaw 一站式可视化管理后台 — 配置编辑、记忆浏览、Skill管理、Cron监控、Session统计、Docker管理",
+  "stack": {
+    "language": "typescript",
+    "runtime": "node",
+    "framework": "next.js 16 (App Router, static export)",
+    "ui": "tailwind css + shadcn/ui + radix-ui",
+    "state": "zustand",
+    "charts": "recharts",
+    "markdown": "react-markdown",
+    "packageManager": "pnpm",
+    "testFramework": null
+  },
+  "deployment": {
+    "platform": "docker (local Mac Air)",
+    "port": 3000,
+    "dockerfile": "nginx:alpine serving static export",
+    "notes": "next build → out/ → nginx, SPA routing via try_files"
+  },
+  "conventions": {
+    "pages": "src/app/*/page.tsx",
+    "components": "src/components/",
+    "stores": "src/stores/*.ts (zustand)",
+    "icons": "lucide-react only, no emoji in UI",
+    "styling": "tailwind + cn() utility",
+    "api": "proxy-server.js for local dev → OpenClaw Gateway API"
+  },
+  "pitfalls": [
+    "Static export — no server-side API routes, all data via Gateway API",
+    "proxy-server.js handles CORS for local dev",
+    "channel-labels.json maps channel IDs to display names"
+  ],
+  "decisions": []
+}
